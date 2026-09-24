@@ -43,7 +43,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "store"))
 import store  # noqa: E402
 
-UA = {"User-Agent": "quant-research-bot" + ((" contact:" + __import__("os").environ["CONTACT_EMAIL"]) if __import__("os").environ.get("CONTACT_EMAIL") else "")}
+UA = {"User-Agent": store.user_agent()}
 API = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency={}&kind=option"
 MONTHS = {m: i + 1 for i, m in enumerate(
     ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"])}

@@ -15,6 +15,10 @@
 <img alt="Access" src="https://img.shields.io/badge/exchange%20access-read--only-a98bff?style=flat-square" />
 </p>
 
+<img src="./docs/media/terminal-overview.png" alt="Quantum Terminal — Overview tab" width="900" />
+
+<sub>The Overview tab on live data. Personal account values (net worth, P&amp;L, positions, risk) are blurred in this image.</sub>
+
 </div>
 
 ---
@@ -25,8 +29,10 @@
 - [Key features](#key-features)
 - [System architecture](#system-architecture)
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
+- [Quick start — the terminal in five minutes](#quick-start--the-terminal-in-five-minutes)
+- [Full setup — building the data platform](#full-setup--building-the-data-platform)
 - [Configuration](#configuration)
+- [Operating guide](#operating-guide)
 - [The terminal](#the-terminal)
 - [Data platform](#data-platform)
 - [Research lab](#research-lab)
@@ -63,7 +69,7 @@ Nothing in the repository can place an order. There is no private key, no signin
 
 **145 features with no look-ahead, proven.** Returns, nine volatility estimators (close-to-close, Parkinson, Garman-Klass, Rogers-Satchell, Yang-Zhang, EWMA, bipower, semi-vol, VaR/CVaR), trend, oscillators, bands, volume flow, risk and candle structure. A verifier recomputes each one a different way; six of its 22 checks truncate future bars and recompute — if a value changes, the feature was peeking.
 
-**Cross-venue panel across 26 exchanges.** Every Hyperliquid coin priced on every reachable exchange every five minutes, including Korean and Indian venues quoting in their own currency. A conservative symbol parser, a staleness mask known *at the time*, and a median consensus price that one frozen venue cannot move.
+**Cross-venue panel across 26 exchanges.** Every Hyperliquid coin priced on every reachable exchange every five minutes, including Korean and Indian venues quoting in their own currency. Reachability depends on where you run it: from the US, 22 answer (Binance and Bybit are geo-blocked there). A conservative symbol parser, a staleness mask known *at the time*, and a median consensus price that one frozen venue cannot move.
 
 **A research method designed to kill ideas.** Cross-sectional rank IC per timestamp (so "the market went up" cannot masquerade as signal), t-statistics on non-overlapping windows, a both-halves test, cost-inclusive books, and a **frozen-rank control** that exposed 100 of 435 "significant" results as coin-picking rather than timing.
 
@@ -161,81 +167,187 @@ sequenceDiagram
 
 ## Prerequisites
 
-| Requirement | Minimum | Notes |
+| Requirement | Version | Notes |
 |---|---|---|
-| Python | 3.10+ (3.12 tested) | Four third-party packages only |
-| RAM | 8 GB | 28 GB+ if you also run the local 35B model |
-| Disk | 10 GB | The full store with features is ~7.2 GB |
-| OS | Windows 10/11 | Developed on Windows; the Python code is cross-platform, the launch scripts are PowerShell |
-| Optional | llama.cpp + a Qwen3 GGUF | The simulator's local model, served on `:8080` |
-| Optional | OpenAI Codex CLI + a ChatGPT plan | The live desk's research and reasoning model |
+| Python | 3.10+ (3.12 tested) | Five packages: `requests`, `websocket-client`, `pandas<3`, `numpy`, `pyarrow` |
+| Git | any | To clone |
+| RAM | 8 GB | 28 GB+ only if you also run the local 35B model |
+| Disk | 1 GB for the quick start | ~10 GB for the full six-year history with features |
+| OS | Windows 10/11 | Developed and tested on Windows. The Python is portable; commands below are shown for PowerShell |
+| Optional | llama.cpp + a Qwen3 GGUF model | Only for the simulator's model roles |
+| Optional | OpenAI Codex CLI + a ChatGPT plan | Only for the live AI desk |
+
+No API keys are required for anything except your own read-only portfolio view.
 
 ---
 
-## Installation
+## Quick start — the terminal in five minutes
 
-### 1. Clone and install
-
-```bash
+```powershell
 git clone https://github.com/devanshagrawal0/quantum-terminal.git
 cd quantum-terminal
 pip install -r requirements.txt
+copy .env.example .env                     # optional values; leave empty to skip the portfolio panel
+
+python scripts/record_venues.py --once     # one pass: every Hyperliquid coin on every reachable exchange (~7 s)
+python scripts/build_features.py           # cross-venue columns for the markets table
+python scripts/dashboard.py                # → open http://localhost:8770
 ```
 
-`requirements.txt` is `requests`, `websocket-client`, `pandas`, `numpy`. Everything else is the standard library — the web server is `http.server`, storage is `sqlite3`.
+What you will see on a fresh install:
 
-### 2. Configure
+- **Live immediately:** globe with regional session returns, Fear & Greed, news river, candlestick chart, watchlist, top movers, order book, funding, correlation heatmap, system status, and the whole Research tab.
+- **Empty until you set `.env`:** portfolio summary, positions, risk overview and liquidation map. They read your account through a public wallet address; with none set they show the error line instead of numbers.
+- **Empty until you build data (next section):** Quant Lab and the 1-day/7-day return columns of the markets table.
 
-```bash
-cp .env.example .env
+To use a different port: `$env:QT_PORT = "8780"; python scripts/dashboard.py`.
+
+---
+
+## Full setup — building the data platform
+
+Run these once, in this order, from the repository folder. Times marked *measured* come from a clean clone on 2026-09-23; the rest are estimates.
+
+| Step | Command | What it does | Time |
+|---|---|---|---|
+| 1 | `python -c "import sys; sys.path.insert(0,'data_layer/store'); import store; store.init()"` | Creates `data/store.db` with all 77 tables | 1 s *measured* |
+| 2 | `python scripts/record_venues.py --once` then `python data_layer/store/sync.py` | One cross-venue snapshot, copied into the store | 10 s *measured* |
+| 3a | `python data_layer/collectors/binance_history.py --months 6 --symbols BTC,ETH,SOL,XRP,DOGE,BNB,ADA,AVAX,LINK,LTC,DOT,SUI,NEAR,AAVE,UNI,TRX,BCH,APT,ARB,PEPE` | **Quick dataset:** 6 months of hourly bars for 20 coins (66,240 bars) | 63 s *measured* |
+| 3b | `python data_layer/collectors/binance_history.py --interval 1h --all` | **Full dataset:** every tracked coin back to January 2020. Resumable — rerun to continue | hours |
+| 4 | `python data_layer/features/compute.py --symbols <same list>` or `--all` | 145 features per bar (quick dataset: 529,890 rows) | 41 s *measured* (quick) |
+| 5 | `python -m sim.xsec` | Betas, residuals, correlation and clusters. Needs at least 10 coins with 40+ days | seconds *measured* |
+| 6 | `python data_layer/collectors/macro_sources.py` | Central-bank rates and macro series (~70,000 points) | ~4 min *measured* |
+| 7 | `python -m sim.events` | Event calendar: FOMC, CPI, NFP 2021–2026, options expiries, listings | seconds *measured* |
+| 8 | `python scripts/measure_carry.py --days 365 --top 80` | One-time year of daily prices and funding for the 80 largest markets (fills the markets table's return columns) | ~15 min |
+| 9 | `python scripts/unlocks_refresh.py --once` | Token-unlock calendar with sizes | ~5 min |
+| 10 | `python -m sim.links` | Estimates the measured links (funding → return, …) the agent is shown | minutes |
+
+Price history comes from Binance's public archive (`data.binance.vision`). Binance's API is blocked in some regions (it answers HTTP 451 in the US); the collector detects that and reads the archive's own symbol listing instead, so no step above needs a VPN or a key.
+
+### Keep it collecting
+
+```powershell
+python scripts/watchdog.py            # starts and supervises the 9 collectors; leave this window open
+python scripts/watchdog.py --status   # in another window: every job and how fresh its data is
 ```
 
-Every value is optional. With an empty `.env` the market pages, the data platform, the research lab and the desk all work; only the personal portfolio panel stays empty.
+The watchdog restarts any collector whose data stops moving. Press `Ctrl+C` in its window to stop it; it shuts down every collector it started.
 
-### 3. Run the terminal
+### Verify
 
-```bash
-python scripts/dashboard.py        # → http://localhost:8770
+```powershell
+python scripts/selftest.py              # 68 checks
+python data_layer/features/verify.py    # 22 independent feature proofs → PASS 22 FAIL 0
+python scripts/probe.py BTC             # live end-to-end check against the real exchange, no mocks
 ```
 
-### 4. Start the collectors
-
-```bash
-python scripts/watchdog.py          # launches and supervises the 9 collectors
-python scripts/watchdog.py --status # health: is each job's data still moving
-```
-
-### 5. Build history and features
-
-```bash
-python data_layer/collectors/binance_history.py --interval 1h --all   # 6.5 years of hourly bars, resumable
-python data_layer/features/compute.py --all                           # 145 features per bar (disk-heavy)
-```
-
-### Verifying the install
-
-```bash
-python scripts/selftest.py              # 68 checks that can fail
-python data_layer/features/verify.py    # 22 independent feature proofs — expect PASS 22 FAIL 0
-python scripts/probe.py BTC             # live end-to-end proof against the real API, no mocks
-```
+Measured on 2026-09-23: **68 / 68** on the full dataset; **62 / 68** on the quick dataset. The six that need the full dataset are, by name: `D14` and `D15` (clusters need the whole universe), `J-feat` (expects more than 20 coins), `C24s` (FOMC reactions need history back to 2021), `C12s` (needs step 9) and `C48s` (needs step 10). The feature proofs pass 22 / 22 on both.
 
 ---
 
 ## Configuration
 
-All configuration is environment variables in `.env`, which is gitignored.
+`.env` (gitignored) — every value optional:
 
 | Variable | Purpose |
 |---|---|
-| `HL_ACCOUNT_ADDRESS` | Public Hyperliquid address for the read-only portfolio view |
+| `HL_ACCOUNT_ADDRESS` | Public Hyperliquid address for the read-only portfolio |
 | `LIGHTER_L1_ADDRESS` | Public address used on Lighter |
 | `LIGHTER_READONLY_TOKEN` | Lighter **read-only** token — cannot trade or withdraw |
-| `CONTACT_EMAIL` | Optional contact sent in the User-Agent to public data APIs that request one |
+| `CONTACT_EMAIL` | Contact sent in the User-Agent to public data APIs that ask for one |
 
-The file header and `SECURITY.md` say it plainly: never put a private key, seed phrase or trading API key here. Nothing in the code would use one.
+Environment variables for running things:
 
-The live desk needs the Codex CLI signed in once (`codex login`); the connector never touches authentication itself. The simulator expects an OpenAI-compatible llama.cpp server on `127.0.0.1:8080`.
+| Variable | Used by | Purpose |
+|---|---|---|
+| `QT_PORT` | terminal | Port for `dashboard.py` (default `8770`) |
+| `SIM_LLM` | simulator | Model endpoint: `openai:<model>@<base_url>`, `ollama:<model>` or `anthropic:<model>` |
+| `SIM_THINK_TOKENS` | simulator | Strategist thinking budget (default 7000) |
+| `SIM_SKEPTIC` | simulator | `0` turns the skeptic role off (for A/B runs) |
+| `SIM_REFRESH` | simulator | `1` rebuilds the cached data frames |
+
+Never put a private key, seed phrase or trading API key anywhere in this project. Nothing in it would use one.
+
+---
+
+## Operating guide
+
+### Everyday
+
+| Task | Command |
+|---|---|
+| Open the terminal | `python scripts/dashboard.py` → http://localhost:8770 |
+| Start / check the collectors | `python scripts/watchdog.py` · `python scripts/watchdog.py --status` |
+| Everything known about a coin | `python scripts/dossier.py BTC ETH` · `python scripts/dossier.py --scan` |
+| Live tape and book for one coin | `python scripts/stream.py HYPE --seconds 120` |
+| Your read-only account in the console | `$env:HL_ACCOUNT_ADDRESS = "0x..."; python scripts/account_check.py` |
+| Log a call before the outcome exists | `python scripts/predict.py --add BTC long 24 --conf 0.6 --thesis "..."` |
+| Score due calls · scoreboard · tamper check | `python scripts/predict.py --resolve` · `--board` · `--verify` |
+| Regenerate the trading dossier | `python scripts/report.py` → `docs/trading/TRADING_DOSSIER.md` |
+
+### Research lab
+
+Every script prints its method and its verdict; results go to the console and `data/`.
+
+| Question | Command |
+|---|---|
+| Does any feature predict 1/3/7-day returns? | `python scripts/kill_test.py` |
+| Does funding / carry predict a move? | `python scripts/measure_carry.py --cached` |
+| Residual momentum and reversal | `python scripts/measure_momentum.py` |
+| Crowd positioning | `python scripts/measure_positioning.py --cached` |
+| 1-day reversal on the majors, net of costs | `python scripts/reversal_majors.py --top 20,40,80` |
+| Funding carry as a real book (plain and beta-hedged) | `python scripts/funding_pnl.py` · `python scripts/funding_hedged.py` |
+| Calendar effects (FOMC, CPI, weekday) | `python scripts/seasonality.py` |
+| Listing shorts · blow-off fades · breakouts | `python scripts/listing_effect.py` · `fade_blowoff.py` · `breakout_validate.py` |
+
+### Simulator
+
+Rule agents need no model:
+
+```powershell
+python -m sim.run --batch trend,random,learning_trend --years 2021-2026 --universe 60
+```
+
+The model-driven agent needs an OpenAI-compatible server. With llama.cpp:
+
+```powershell
+llama-server -m <path>\Qwen3.6-35B-A3B-UD-Q3_K_XL.gguf --host 127.0.0.1 --port 8080 -c 16384 -t 6 -ngl 0 --jinja
+$env:SIM_LLM = "openai:qwen@http://127.0.0.1:8080/v1"
+python -m sim.run --agent investigator --start 2026-08-10 --end 2026-08-18 --fresh-memory
+python scripts/benchmark.py data/sim/runs/<run folder>
+```
+
+Each run writes `data/sim/runs/<stamp>_<agent>/decisions.jsonl` (every question, tool result, chain, skeptic verdict and risk check) and `summary.json`. Expect minutes per decision on a CPU.
+
+### Live AI desk
+
+One-time: install the Codex CLI (`npm install -g @openai/codex`, or the ChatGPT extension for VS Code, which bundles it) and sign in with `codex login`. The connector finds the binary itself and never touches authentication.
+
+| Task | Command |
+|---|---|
+| Check the connection | `python -c "import sys; sys.path.insert(0,'.'); from sim.codex_backend import login_status; print(login_status())"` |
+| One desk call (research + trades) | `python scripts/desk_call.py --mode structured --budget 500` |
+| Deep call — unbounded research, own budget | `python scripts/desk_call.py --mode deep --budget 100 --portfolio P2` |
+| Raw mode — model computes its own features | `python scripts/desk_raw.py --budget 100 --rounds 4` |
+| Settle a run on real candles | `python scripts/desk_call.py --settle data/desk_calls/<stamp>.json` |
+| Per-trade review of a closed run | `python scripts/desk_call.py --review data/desk_calls/<stamp>.json` |
+| Run the desk on a clock | `python scripts/desk_loop.py` (every 30 min; new calls at 08:00 and 20:00 New York) · `--once` for one cycle |
+| Watch it | the **Desk** tab in the terminal |
+
+Every model call is saved under `data/codex/<stamp>_<tag>/` with its prompt, schema, answer and event stream. The desk runs on your ChatGPT plan's Codex allowance: a deep session used about 2.6 million tokens, and when the allowance runs out Codex reports the reset time.
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `Binance API unreachable (HTTP Error 451)` | Normal in the US. The history collector falls back to the archive listing automatically |
+| Portfolio panels show errors | `.env` has no wallet address — expected if you are not viewing your own account |
+| Markets table has empty return / basis columns | Run steps 8 and `python scripts/build_features.py` |
+| Quant Lab is empty | Run steps 1–4 |
+| Port 8770 already in use | `$env:QT_PORT = "8780"` before starting the terminal |
+| Simulator: `SIM_LLM not set` | Set `SIM_LLM` as shown above, and check `http://127.0.0.1:8080/health` answers |
+| Desk: `codex.exe not found` or `Not logged in` | Install the Codex CLI and run `codex login` |
+| Desk: `You've hit your usage limit` | The ChatGPT plan's Codex allowance is spent; it names the reset time |
 
 ---
 

@@ -565,3 +565,111 @@ CREATE TABLE IF NOT EXISTS data_quality (
   ts_ms INTEGER NOT NULL, table_name TEXT, asset_id INTEGER,
   check_name TEXT, passed INTEGER, detail TEXT
 );
+
+-- ---------------------------------------------------------------------------
+-- Tables created by later build steps (feature engine, cross-sectional layer,
+-- macro / prediction-market / reference collectors). Copied verbatim from the
+-- production store so that a fresh `store.init()` builds the same schema.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cert_log (
+  domain TEXT, cert_id TEXT, name_value TEXT, issued_ts INTEGER,
+  first_seen_ms INTEGER, PRIMARY KEY (domain, cert_id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS chokepoint_transit (
+  portid TEXT NOT NULL, date TEXT NOT NULL, ts_ms INTEGER,
+  portname TEXT, n_total REAL, n_cargo REAL, n_tanker REAL,
+  n_container REAL, n_drybulk REAL, capacity REAL,
+  PRIMARY KEY (portid, date)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS company_ref (
+  id INTEGER PRIMARY KEY, lei TEXT UNIQUE, cik TEXT, name TEXT,
+  jurisdiction TEXT, legal_form TEXT, status TEXT,
+  sic TEXT, state_of_incorporation TEXT, tickers TEXT, observed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS cot_position (
+  report_date TEXT NOT NULL, market TEXT NOT NULL, ts_ms INTEGER,
+  open_interest REAL, noncomm_long REAL, noncomm_short REAL,
+  comm_long REAL, comm_short REAL, nonrept_long REAL, nonrept_short REAL,
+  PRIMARY KEY (report_date, market)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS event_instance (
+  id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, entity TEXT, asset_id INTEGER,
+  scheduled_ts INTEGER NOT NULL, ts_precision TEXT NOT NULL,
+  consensus REAL, consensus_source TEXT, realised REAL, realised_source TEXT, surprise_z REAL,
+  observed_at INTEGER NOT NULL, source_url TEXT,
+  UNIQUE(event_type, entity, scheduled_ts)
+);
+CREATE TABLE IF NOT EXISTS event_type (
+  id TEXT PRIMARY KEY, family TEXT NOT NULL, scheduled INTEGER NOT NULL, default_horizons TEXT
+);
+CREATE TABLE IF NOT EXISTS feat_bands (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, bb_upper REAL, bb_mid REAL, bb_lower REAL, bb_width REAL, bb_pctb REAL, keltner_up REAL, keltner_lo REAL, keltner_width REAL, atr_band_up REAL, atr_band_lo REAL, chandelier_exit REAL, squeeze_flag REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_candle (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, body_pct REAL, upper_wick_pct REAL, lower_wick_pct REAL, range_pct REAL, gap_pct REAL, inside_bar REAL, outside_bar REAL, doji REAL, close_loc REAL, hi_lo_2d REAL, n_up_bars_7d REAL, consec_up REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_cross (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, beta_btc REAL, beta_eth REAL, corr_btc_30d REAL, corr_btc_90d REAL, resid_r_1d REAL, resid_r_7d REAL, resid_mom_7d_skip1 REAL, rank_ret_1d REAL, rank_ret_7d REAL, rank_vol REAL, idio_vol REAL, r2_btc REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_osc (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, rsi_7 REAL, rsi_14 REAL, rsi_21 REAL, stoch_k REAL, stoch_d REAL, stoch_rsi REAL, williams_r REAL, cci_20 REAL, roc_5 REAL, roc_10 REAL, roc_20 REAL, momentum_10 REAL, tsi REAL, ultimate_osc REAL, chande_mom REAL, coppock REAL, kst REAL, awesome_osc REAL, fisher_transform REAL, trix REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_ret (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, r_1h REAL, r_4h REAL, r_12h REAL, r_1d REAL, r_3d REAL, r_7d REAL, r_14d REAL, r_30d REAL, r_90d REAL, mom_7d_skip1 REAL, mom_30d_skip1 REAL, mom_90d_skip7 REAL, rev_1h REAL, rev_1d REAL, ret_zscore REAL, logret_cum REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_risk (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, drawdown REAL, max_dd_30d REAL, max_dd_1y REAL, ulcer_index REAL, sharpe_30d REAL, sortino_30d REAL, calmar REAL, var_95 REAL, cvar_95 REAL, autocorr_1 REAL, variance_ratio REAL, entropy REAL, tail_ratio REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_trend (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, sma_5 REAL, sma_10 REAL, sma_20 REAL, sma_50 REAL, sma_100 REAL, sma_200 REAL, ema_9 REAL, ema_12 REAL, ema_21 REAL, ema_26 REAL, ema_50 REAL, ema_200 REAL, macd REAL, macd_signal REAL, macd_hist REAL, adx_14 REAL, di_plus REAL, di_minus REAL, aroon_up REAL, aroon_down REAL, aroon_osc REAL, psar REAL, supertrend REAL, linreg_slope REAL, hurst REAL, donchian_hi REAL, donchian_lo REAL, donchian_mid REAL, ich_tenkan REAL, ich_kijun REAL, ich_senkou_a REAL, ich_senkou_b REAL, ich_chikou REAL, px_vs_sma50 REAL, px_vs_sma200 REAL, golden_cross REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_vol_flow (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, obv REAL, vwap_24h REAL, vwap_dev REAL, vol_sma_20 REAL, vol_zscore REAL, vol_surprise REAL, cmf REAL, ad_line REAL, force_index REAL, eom REAL, volume_rsi REAL, pvt REAL, mfi_14 REAL, trade_count REAL, avg_trade_size REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS feat_volat (ts_ms INTEGER NOT NULL, asset_id INTEGER NOT NULL, rv_24h REAL, rv_7d REAL, rv_30d REAL, parkinson REAL, garman_klass REAL, rogers_satchell REAL, yang_zhang REAL, bipower REAL, jump_frac REAL, atr_14 REAL, atr_pct REAL, ewma_vol REAL, vol_of_vol REAL, realized_skew REAL, realized_kurt REAL, semi_vol_up REAL, semi_vol_down REAL, ud_vol_ratio REAL, vol_ratio_7_30 REAL, vol_pctile_1y REAL, vol_zscore REAL, PRIMARY KEY (asset_id, ts_ms)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS filing (
+  accession TEXT PRIMARY KEY, cik TEXT, company TEXT, form TEXT,
+  filing_date TEXT, acceptance_ts INTEGER, items TEXT,
+  primary_doc TEXT, observed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS geo_event (
+  source TEXT, event_id TEXT, ts_ms INTEGER, kind TEXT,
+  magnitude REAL, lat REAL, lon REAL, place TEXT, detail TEXT,
+  PRIMARY KEY (source, event_id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS job_posting (
+  company TEXT, job_id TEXT, title TEXT, location TEXT,
+  posted_ts INTEGER, first_seen_ms INTEGER, url TEXT,
+  PRIMARY KEY (company, job_id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS link (
+  id INTEGER PRIMARY KEY, shock TEXT NOT NULL, target TEXT NOT NULL, horizon_days INTEGER NOT NULL,
+  beta_bps_per_1sd REAL, se REAL, tstat REAL, n_obs INTEGER, n_days INTEGER, sign_agree_k_of_4 INTEGER,
+  sample_start INTEGER, sample_end INTEGER, as_of INTEGER NOT NULL, status TEXT NOT NULL, estimator TEXT NOT NULL,
+  UNIQUE(shock, target, horizon_days, as_of)
+);
+CREATE TABLE IF NOT EXISTS macro_series (
+  source TEXT NOT NULL, series_id TEXT NOT NULL, ts_ms INTEGER NOT NULL,
+  value REAL, unit TEXT, geo TEXT, observed_at INTEGER,
+  PRIMARY KEY (source, series_id, ts_ms)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS onchain_metric (
+  source TEXT, metric TEXT, entity TEXT, ts_ms INTEGER,
+  value REAL, chain TEXT, PRIMARY KEY (source, metric, entity, ts_ms)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS option_quote (
+  ts_ms INTEGER NOT NULL, venue_id INTEGER, asset_id INTEGER,
+  instrument TEXT NOT NULL, expiry_ms INTEGER, strike REAL, opt_type TEXT,
+  bid REAL, ask REAL, mark REAL, mark_iv REAL,
+  open_interest REAL, volume REAL, underlying REAL,
+  delta REAL, tte_days REAL,
+  PRIMARY KEY (instrument, ts_ms)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS prediction_market (
+  venue TEXT NOT NULL, market_id TEXT NOT NULL, ts_ms INTEGER NOT NULL,
+  question TEXT, category TEXT,
+  yes_price REAL, no_price REAL, yes_bid REAL, yes_ask REAL,
+  volume REAL, liquidity REAL, open_interest REAL,
+  close_ts INTEGER, status TEXT,
+  PRIMARY KEY (venue, market_id, ts_ms)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sanction_entity (
+  list_name TEXT, uid TEXT, name TEXT, entity_type TEXT,
+  program TEXT, country TEXT, observed_at INTEGER,
+  PRIMARY KEY (list_name, uid)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS watchdog_events (
+  ts_ms INTEGER NOT NULL, job TEXT NOT NULL,
+  event TEXT, detail TEXT, data_age_s REAL,
+  PRIMARY KEY (ts_ms, job)
+);
+CREATE INDEX IF NOT EXISTS idx_filing_cik ON filing(cik, filing_date);
+CREATE INDEX IF NOT EXISTS idx_macro_ts ON macro_series(ts_ms);
+CREATE INDEX IF NOT EXISTS idx_optq_asset_ts ON option_quote(asset_id, ts_ms);
+CREATE INDEX IF NOT EXISTS idx_predmkt_close ON prediction_market(close_ts);
+CREATE INDEX IF NOT EXISTS idx_predmkt_ts ON prediction_market(ts_ms);
+CREATE INDEX IF NOT EXISTS ix_evi_ts ON event_instance(scheduled_ts);

@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "store"))
 import store  # noqa: E402
 
-UA = "quant-research-bot" + ((" contact:" + __import__("os").environ["CONTACT_EMAIL"]) if __import__("os").environ.get("CONTACT_EMAIL") else "")
+UA = store.user_agent()
 
 
 def _env(key: str) -> str:

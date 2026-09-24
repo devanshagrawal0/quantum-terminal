@@ -691,11 +691,11 @@ def h_srv():
 
 @test("D-stamp", "D")
 def d_stamp():
-    """the cache stamp covers candles, funding and positioning (three parts)"""
+    """the cache stamp covers newest candle, candle count, funding and positioning (four parts)"""
     from sim.data import _store_stamp
     st = _store_stamp()
     parts = st.split("|")
-    return len(parts) == 3 and all(p.isdigit() for p in parts) and int(parts[0]) > 0, st
+    return len(parts) == 4 and all(p.isdigit() for p in parts) and int(parts[0]) > 0 and int(parts[1]) > 0, st
 
 
 @test("J-feat", "D")

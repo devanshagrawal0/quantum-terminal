@@ -50,6 +50,7 @@ def refresh_data() -> None:
     import pandas as pd
     from hl.info import Info, now_ms
     info = Info()
+    PRICE_PARQUET.parent.mkdir(parents=True, exist_ok=True)   # fresh install: data/carry_cache does not exist yet
     coins = _live_coins(info)
     end = now_ms()
     start = end - (TAIL_DAYS + 2) * DAY_MS

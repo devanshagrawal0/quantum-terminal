@@ -45,11 +45,14 @@ def _ro(path: Path) -> sqlite3.Connection:
 
 
 def _store_stamp() -> str:
-    """The newest candle, funding row and positioning row; a cache built before any of them is stale."""
+    """The newest candle, funding row and positioning row, plus the candle count; a cache built
+    before any of them changed is stale. The count matters: backfilling more coins over the same
+    dates leaves every MAX unchanged, and the cache would silently keep the smaller universe."""
     parts = []
     try:
         conn = _ro(STORE)
         parts.append(conn.execute("SELECT MAX(ts_ms) FROM ohlcv WHERE interval='1h'").fetchone()[0])
+        parts.append(conn.execute("SELECT COUNT(*) FROM ohlcv WHERE interval='1h'").fetchone()[0])
         parts.append(conn.execute("SELECT MAX(ts_ms) FROM perp_state").fetchone()[0])
         conn.close()
     except Exception:

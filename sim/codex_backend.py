@@ -75,10 +75,8 @@ def find_codex() -> Optional[str]:
     cands = [c for c in cands if Path(c).exists()]
     if cands:
         return sorted(cands, key=lambda p: Path(p).stat().st_mtime, reverse=True)[0]
-    for p in os.environ.get("PATH", "").split(os.pathsep):
-        if (Path(p) / "codex.exe").exists():
-            return str(Path(p) / "codex.exe")
-    return None
+    import shutil
+    return shutil.which("codex")          # npm / standalone installs on PATH (codex.exe or codex.cmd)
 
 
 def login_status() -> Dict:

@@ -533,7 +533,7 @@ class InvestigatorAgent(LLMAgent):
                  "stops_report_this_side": box.call("stops_report", {"side": o.side})}
             dossier.append(d)
         extra = {"active_insights": box.call("insights", {}), "calibration": box.call("calibration", {}),
-                 "book": {"words": self.last_portfolio.get("words"), "positions": [{k: v for k, v in r.items() if k != "coin"} for r in self.last_portfolio.get("positions", [])]}}
+                 "book": {"words": getattr(self, "last_portfolio", {}).get("words"), "positions": [{k: v for k, v in r.items() if k != "coin"} for r in getattr(self, "last_portfolio", {}).get("positions", [])]}}
         labs = [labels.get(o.coin, o.coin) for o in orders] + list(box.open_positions)
         if len(labs) >= 2:
             extra["correlations"] = box.call("correlations", {"coins": labs})

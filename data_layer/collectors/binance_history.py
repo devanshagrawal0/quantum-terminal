@@ -37,7 +37,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "store"))
 import store  # noqa: E402
 
-UA = {"User-Agent": "quant-research-bot" + ((" contact:" + __import__("os").environ["CONTACT_EMAIL"]) if __import__("os").environ.get("CONTACT_EMAIL") else "")}
+UA = {"User-Agent": store.user_agent()}
 BASE = "https://data.binance.vision/data/futures/um/monthly/klines"
 FAPI = "https://fapi.binance.com/fapi/v1/exchangeInfo"
 MULT_PREFIXES = [("", 1), ("1000", 1000), ("1000000", 1_000_000)]
@@ -76,13 +76,33 @@ def http(url, timeout=30, retries=4):
     raise RuntimeError("unreachable")
 
 
+LISTING = ("https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
+           "?prefix=data/futures/um/monthly/klines/&delimiter=/")
+
+
+def archive_symbols():
+    """Every USDT-margined perp that has monthly kline files in the public archive.
+    The bucket listing is paged (1,000 keys per page), so follow the marker."""
+    import re
+    out, marker = set(), ""
+    while True:
+        xml = http(LISTING + (f"&marker={marker}" if marker else "")).decode("utf-8", "replace")
+        page = re.findall(r"<Prefix>data/futures/um/monthly/klines/([^/<]+)/</Prefix>", xml)
+        out.update(s for s in page if s.endswith("USDT"))
+        if "<IsTruncated>true</IsTruncated>" not in xml or not page:
+            return out
+        nxt = re.findall(r"<NextMarker>([^<]+)</NextMarker>", xml)
+        marker = nxt[0] if nxt else f"data/futures/um/monthly/klines/{page[-1]}/"
+
+
 def binance_symbol_map(assets, conn=None):
     """our asset symbol -> (binance symbol, multiplier). Multiplier matters.
 
     GEO-BLOCK: Binance's API hosts (fapi/api.binance.com) return HTTP 451
     "Unavailable For Legal Reasons" from some regions (confirmed 2026-09-09). The ARCHIVE host data.binance.vision is NOT blocked.
-    So we prefer the mapping already stored in venue_symbol and only fall
-    back to the API when the DB has nothing.
+    So we prefer the mapping already stored in venue_symbol and look up only
+    the assets it does not know - through the API, or the archive's own
+    listing when the API is blocked.
     """
     out = {}
     if conn is not None:
@@ -94,17 +114,24 @@ def binance_symbol_map(assets, conn=None):
             if asset in assets:
                 out[asset] = (sym, mult or 1)
         if out:
-            print(f"  symbol map from DB ({len(out)} assets) — API not needed")
+            print(f"  symbol map from DB: {len(out)} of {len(assets)} assets")
+        if len(out) == len(set(assets)):
             return out
+    todo = [a for a in assets if a not in out]
 
     try:
         ex = json.loads(http(FAPI, 30))
+        trading = {s["symbol"] for s in ex["symbols"] if s.get("status") == "TRADING"}
     except Exception as e:
-        raise SystemExit(
-            f"Binance API unreachable ({str(e)[:60]}) and no cached symbol map "
-            f"in venue_symbol. Run once from a non-blocked network to seed it.")
-    trading = {s["symbol"] for s in ex["symbols"] if s.get("status") == "TRADING"}
-    for a in assets:
+        # The API is geo-blocked (451) in some regions; the archive's own bucket
+        # listing is not, and it names every USDT perp that has history files.
+        print(f"  Binance API unreachable ({str(e)[:40]}) - reading the symbol list from the archive")
+        try:
+            trading = archive_symbols()
+        except Exception as e2:
+            raise SystemExit(f"Neither the Binance API nor the archive listing answered ({str(e2)[:60]}).")
+        print(f"  archive lists {len(trading)} USDT perps")
+    for a in todo:
         for pfx, mult in MULT_PREFIXES:
             cand = f"{pfx}{a}USDT"
             if cand in trading:

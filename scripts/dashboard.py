@@ -25,7 +25,7 @@ from hl import watchlist as wl  # noqa: E402
 from hl import regime as regime_mod  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-PORT = 8770
+PORT = int(__import__("os").environ.get("QT_PORT", "8770"))
 _cache = {"t": 0.0, "data": None}
 _spark = {"t": 0.0, "px": None}
 _narr = {"t": 0.0, "raw": None, "syms": None}

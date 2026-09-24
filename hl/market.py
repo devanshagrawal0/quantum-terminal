@@ -52,17 +52,23 @@ def market_overview() -> Dict[str, Any]:
     """Every tradable HL coin + its signals, plus the snapshot timestamps."""
     conn = sqlite3.connect(f"file:{VENUES_DB}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
+    have = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 
-    cv_ts = conn.execute("SELECT MAX(ts_ms) FROM cv_features").fetchone()[0]
+    def newest(table):
+        # a fresh install has no cv_features until build_features.py runs and no
+        # positioning until backfill_positioning.py runs: those columns are empty, not an error
+        return conn.execute(f"SELECT MAX(ts_ms) FROM {table}").fetchone()[0] if table in have else None
+
+    cv_ts = newest("cv_features")
     cv = {r["coin"]: dict(r) for r in conn.execute(
         "SELECT * FROM cv_features WHERE ts_ms=?", (cv_ts,)).fetchall()} if cv_ts else {}
 
-    hl_ts = conn.execute("SELECT MAX(ts_ms) FROM hl_state").fetchone()[0]
+    hl_ts = newest("hl_state")
     hl = {r["coin"]: dict(r) for r in conn.execute(
         "SELECT coin, mid, mark, oracle, funding_hourly, oi_base FROM hl_state "
         "WHERE ts_ms=?", (hl_ts,)).fetchall()} if hl_ts else {}
 
-    pos_ts = conn.execute("SELECT MAX(ts_ms) FROM positioning").fetchone()[0]
+    pos_ts = newest("positioning")
     pos = {r["coin"]: dict(r) for r in conn.execute(
         "SELECT coin, long_frac, top_long_frac FROM positioning WHERE ts_ms=?",
         (pos_ts,)).fetchall()} if pos_ts else {}

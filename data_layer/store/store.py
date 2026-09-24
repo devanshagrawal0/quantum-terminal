@@ -18,6 +18,23 @@ DB_PATH = ROOT / "data" / "store.db"
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 
 
+
+def user_agent() -> str:
+    """User-Agent for public data APIs. Some (the SEC among them) ask callers to identify
+    themselves: CONTACT_EMAIL from the environment, else from the repo's private .env."""
+    import os
+    mail = os.environ.get("CONTACT_EMAIL", "").strip()
+    if not mail:
+        try:
+            env = Path(__file__).resolve().parents[2] / ".env"
+            for line in env.read_text(encoding="utf-8").splitlines():
+                if line.strip().startswith("CONTACT_EMAIL="):
+                    mail = line.split("=", 1)[1].strip().strip('"').strip("'")
+        except OSError:
+            pass
+    return "quant-research-bot" + (f" contact:{mail}" if mail else "")
+
+
 def connect(path: Path | str = DB_PATH, read_only: bool = False) -> sqlite3.Connection:
     """Open the store. WAL mode so collectors can write while we read."""
     if read_only:

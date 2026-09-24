@@ -138,13 +138,14 @@ class RiskHat:
         eq = pd.Series({ts: e for ts, e in self.book.equity_curve}).sort_index()
         out = []
         if len(eq) >= 2:
+            # the documented brakes are measured on equity (spec 4.7): 15% below the peak, 3% down on the day
             peak = eq.cummax().iloc[-1]
-            dd = peak - eq.iloc[-1]
-            if dd > DD_CAP * self.risk_capital:
-                out.append(f"drawdown ${dd:,.0f} > {DD_CAP * 100:.0f}% of risk capital ${self.risk_capital:,.0f}: no new trades")
-            day = eq.diff().dropna()
-            if len(day) and day.iloc[-1] < -DAY_LOSS_CAP * self.risk_capital:
-                out.append(f"day loss ${-day.iloc[-1]:,.0f} > {DAY_LOSS_CAP * 100:.0f}% of risk capital ${self.risk_capital:,.0f}: no new trades")
+            dd = (peak - eq.iloc[-1]) / peak if peak > 0 else 0.0
+            if dd > DD_CAP:
+                out.append(f"drawdown {dd * 100:.1f}% from peak > {DD_CAP * 100:.0f}%: no new trades")
+            day = eq.pct_change().dropna()
+            if len(day) and day.iloc[-1] < -DAY_LOSS_CAP:
+                out.append(f"day loss {-day.iloc[-1] * 100:.1f}% > {DAY_LOSS_CAP * 100:.0f}%: no new trades")
             day = eq.pct_change().dropna()
             if len(day) >= 100 and day.iloc[-1] <= day.quantile(0.01):
                 self.brake_until = t + 5 * 86_400_000

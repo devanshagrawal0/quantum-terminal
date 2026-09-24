@@ -59,7 +59,9 @@ from typing import Dict, List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-UA = {"User-Agent": "quant-research-bot" + ((" contact:" + __import__("os").environ["CONTACT_EMAIL"]) if __import__("os").environ.get("CONTACT_EMAIL") else "")}
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "data_layer" / "store"))
+import store  # noqa: E402
+UA = {"User-Agent": store.user_agent()}
 BASE = "https://data.binance.vision/data/futures/um/daily/metrics"
 ROOT = Path(__file__).resolve().parents[1]
 STORE_DB = ROOT / "data" / "store.db"
