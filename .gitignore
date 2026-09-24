@@ -18,3 +18,4 @@ __pycache__/
 # private working notes (machine, personal workflow) - kept local
 HANDOFF.md
 docs/PROJECT_SPEC_FOR_RESUME_*.md
+scripts/terminal_backup_*.html

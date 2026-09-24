@@ -11,7 +11,7 @@ Everything we must not forget, pulled from the real data into one report:
 Generated FROM the databases (journal / research / watchlist / paper) and the rules
 file, so it can never go stale — regenerate any time:
 
-    python scripts/report.py            # writes TRADING_DOSSIER.md
+    python scripts/report.py            # writes docs/trading/TRADING_DOSSIER.md
 
 This is the thing we read to remember what works, what burned us, and why.
 """
@@ -110,7 +110,7 @@ def build():
     W("---")
     W("## 2 · Rulebook & Lessons")
     W("")
-    lf = ROOT / "LEARNINGS_AND_RULES.md"
+    lf = ROOT / "docs" / "trading" / "LEARNINGS_AND_RULES.md"
     if lf.exists():
         txt = lf.read_text(encoding="utf-8")
         body = txt.split("\n", 1)[1] if "\n" in txt else txt
@@ -215,7 +215,7 @@ def build():
     W(f"*Generated {time.strftime('%Y-%m-%d %H:%M')} · {rev.get('n',0)} closed trades on record.*")
 
     txt = "\n".join(out) + "\n"
-    (ROOT / "TRADING_DOSSIER.md").write_text(txt, encoding="utf-8")
+    (ROOT / "docs" / "trading" / "TRADING_DOSSIER.md").write_text(txt, encoding="utf-8")
     return len(txt), rev.get("n", 0)
 
 

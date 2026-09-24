@@ -441,7 +441,7 @@ No trading profit is claimed. The contribution is the infrastructure and a metho
 - **Code owns numbers; the model owns reasoning.** A decision made from measured model failure modes, not taste.
 - **Provenance.** Every fact the model uses carries a URL and a time, or it is dropped.
 - **Tamper evidence.** Plans and predictions are hashed when written.
-- **A graveyard, kept.** Rejected ideas are recorded with the test that rejected them (`STRATEGY.md`, `docs/KILL_TEST_2026-09-13.md`).
+- **A graveyard, kept.** Rejected ideas are recorded with the test that rejected them (`docs/trading/STRATEGY.md`, `docs/KILL_TEST_2026-09-13.md`).
 - **Read-only by construction.** No key, no signing, no order endpoint, anywhere.
 - **Operations measured.** The store was moved out of a synced folder after measuring a 37-deep disk queue; backfills are resumable, newest-first, paced and backed off.
 
@@ -472,7 +472,10 @@ data_layer/              unified store
 sim/                     the agent
   data.py · tools.py · investigator.py · risk.py · engine.py · memory.py
   xsec.py · links.py · events.py · agents.py · run.py · codex_backend.py
-docs/                    specifications, dated experiment write-ups, the 12-chapter manual
+docs/                    dated experiment write-ups and specifications
+  design/                  the long-term vision, pipeline, build plan, terminal mockup
+  trading/                 strategy, rules and lessons, market dynamics, generated trading dossier
+  manual/                  the 12-chapter desk manual the agent reads
 research/                ~7,300 lines: driver taxonomy, world context, news impact, market mechanics, cross-venue features
 ```
 
