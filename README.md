@@ -218,7 +218,7 @@ Run these once, in this order, from the repository folder. Times marked *measure
 | 5 | `python -m sim.xsec` | Betas, residuals, correlation and clusters. Needs at least 10 coins with 40+ days | seconds *measured* |
 | 6 | `python data_layer/collectors/macro_sources.py` | Central-bank rates and macro series (~70,000 points) | ~4 min *measured* |
 | 7 | `python -m sim.events` | Event calendar: FOMC, CPI, NFP 2021–2026, options expiries, listings | seconds *measured* |
-| 8 | `python scripts/measure_carry.py --days 365 --top 80` | One-time year of daily prices and funding for the 80 largest markets (fills the markets table's return columns) | ~15 min |
+| 8 | `python scripts/measure_carry.py --days 365 --top 80` | One-time year of daily prices and funding for the 80 largest markets (fills the markets table's return columns). Leave it running: it is not resumable | prices ~3 min *measured*; the funding year took over 40 min |
 | 9 | `python scripts/unlocks_refresh.py --once` | Token-unlock calendar with sizes | ~5 min |
 | 10 | `python -m sim.links` | Estimates the measured links (funding → return, …) the agent is shown | minutes |
 
