@@ -1,0 +1,20 @@
+# secrets - never commit
+.env
+.env.*
+!.env.example
+
+# runtime data: databases, logs, model sessions (multi-GB, rebuilt by the collectors)
+data/*
+!data/.gitkeep
+
+# working files
+scratchpad/
+__pycache__/
+*.pyc
+*.log
+*.err
+*.out
+
+# private working notes (machine, personal workflow) - kept local
+HANDOFF.md
+docs/PROJECT_SPEC_FOR_RESUME_*.md

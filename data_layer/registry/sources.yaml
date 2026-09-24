@@ -1,0 +1,260 @@
+# SINGLE SOURCE OF TRUTH for every external data source.
+# Human-readable detail lives in ../SOURCES.md — keep both in sync.
+# quality/ reads this file to know what "healthy" means per source.
+#
+# status:  verified | unverified | dead | planned
+# auth:    none | key | token
+# freshness_sla_s: max acceptable age before quality/ raises an alarm (null = not collected yet)
+
+meta:
+  cost_policy: free_only          # anything paid requires explicit approval (see SOURCES.md §9)
+  last_audit: 2026-09-02
+
+categories:
+
+  crypto_cex:
+    binance_futures_data:
+      base: https://fapi.binance.com/futures/data/
+      auth: none
+      free: true
+      status: verified
+      verified_on: 2026-09-02
+      endpoints: [topLongShortPositionRatio, globalLongShortAccountRatio, takerlongshortRatio, openInterestHist]
+      gives: [top_trader_positioning, retail_long_short, taker_flow, oi_history]
+      periods: [5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d]
+      collected_periods: [1h]
+      store: venues.db::positioning
+      freshness_sla_s: 7200
+      notes: "the 'Binance top traders' signal; best positioning source we have"
+
+    binance_public_archive:
+      base: https://data.binance.vision/
+      auth: none
+      free: true
+      status: planned
+      priority: 2
+      gives: [klines_history, aggtrades_history, funding_history]
+      why: "unblocks newsystem.md §11 — we only have 9.9 days of stored history"
+      todo: "verify depth + coin coverage before planning backfill"
+
+    multi_venue_quotes:
+      auth: none
+      free: true
+      status: verified
+      verified_on: 2026-09-02
+      store: venues.db::prices
+      coverage: {venues: 26, coins: 178, pairs: 3409, rows: 4287583, history_days: 9.9}
+      freshness_sla_s: 900
+      venues:
+        - {name: bybit,     host: api.bybit.com}
+        - {name: okx,       host: www.okx.com}
+        - {name: kraken,    host: api.kraken.com}
+        - {name: kucoin,    host: api.kucoin.com}
+        - {name: bitget,    host: api.bitget.com}
+        - {name: gateio,    host: api.gateio.ws}
+        - {name: mexc,      host: contract.mexc.com}
+        - {name: htx,       host: api.hbdm.com}
+        - {name: coinbase,  host: api.exchange.coinbase.com}
+        - {name: bitfinex,  host: api-pub.bitfinex.com}
+        - {name: phemex,    host: api.phemex.com}
+        - {name: cryptocom, host: api.crypto.com}
+        - {name: bingx,     host: open-api.bingx.com}
+        - {name: woo,       host: api.woo.org}
+        - {name: bitmart,   host: api-cloud.bitmart.com}
+        - {name: backpack,  host: api.backpack.exchange}
+        - {name: paradex,   host: api.prod.paradex.trade}
+        - {name: aevo,      host: api.aevo.xyz}
+        - {name: dydx,      host: indexer.dydx.trade}
+        - {name: upbit,     host: api.upbit.com,    region: KR, signal: kimchi_premium}
+        - {name: bithumb,   host: api.bithumb.com,  region: KR, signal: kimchi_premium}
+        - {name: wazirx,    host: api.wazirx.com,   region: IN}
+        - {name: coindcx,   host: api.coindcx.com,  region: IN}
+        - {name: bitbns,    host: api.bitbns.com,   region: IN}
+
+  crypto_onchain:
+    hyperliquid_info:
+      base: https://api.hyperliquid.xyz/info
+      method: POST
+      auth: none
+      free: true
+      status: verified
+      verified_on: 2026-09-02
+      requests:
+        recentTrades:          {status: verified, gives: [trades, wallet_addresses], note: "returns `users` = BOTH counterparty wallets — the whale-tracking unlock"}
+        clearinghouseState:    {status: verified, gives: [perp_positions, entry, leverage, liq_price, margin]}
+        clearinghouseState_dex: {status: verified, gives: [hip3_builder_dex_positions], note: "pass dex=<name>"}
+        spotClearinghouseState: {status: verified, gives: [spot_balances]}
+        perpDexs:              {status: verified, gives: [builder_dexes], known: [xyz, flx, vntl, hyna, km, abcd, cash, para, mkts, io]}
+        meta:                  {status: verified, gives: [universe]}
+        allMids:               {status: verified, gives: [mid_prices]}
+        l2Book:                {status: verified, gives: [order_book], gotcha: "coin must be TOP-LEVEL, not nested in req -> else HTTP 422"}
+        candleSnapshot:        {status: verified, gives: [ohlcv]}
+        portfolio:             {status: verified, gives: [account_value_history, pnl_history]}
+        userNonFundingLedgerUpdates: {status: verified, gives: [deposits, withdrawals, transfers]}
+        leaderboard:           {status: dead, error: "HTTP 422", dead_on: 2026-09-02}
+
+    lighter:
+      base: https://mainnet.zklighter.elliot.ai/api/v1
+      auth: token
+      env_key: LIGHTER_READONLY_TOKEN
+      permissions: read_only
+      free: true
+      status: verified
+      verified_on: 2026-09-02
+      endpoints: [/accountsByL1Address, /account, /orderBookDetails, /orderBooks, /trades, /pnl]
+      gotchas:
+        - "spot tokens live under `assets` with margin_mode='disabled'"
+        - "spot tokens are EXCLUDED from total_asset_value"
+        - "spot markets are 'SYM/USDC' in /orderBooks"
+
+    defillama:
+      hosts: [api.llama.fi, stablecoins.llama.fi, defillama-datasets.llama.fi]
+      auth: none
+      free: true
+      status: unverified
+      gives: [tvl, protocol_flows, stablecoin_supply]
+
+  derivatives:
+    deribit:
+      base: https://www.deribit.com/api/v2/public/
+      auth: none
+      free: true
+      status: unverified
+      in_use: [dvol_index]
+      planned:
+        options_chain:
+          endpoints: [get_instruments, get_book_summary_by_currency, ticker]
+          gives: [skew, put_call_ratio, term_structure, max_pain]
+          priority: 4
+
+  news:
+    crypto_media:
+      auth: none
+      free: true
+      status: unverified
+      store: events.db::events
+      coverage: {events: 441, history_days: 9.3}
+      freshness_sla_s: 3600
+      hosts: [coindesk.com, cointelegraph.com, cryptoslate.com, decrypt.co, bitcoinist.com,
+              bitcoinmagazine.com, newsbtc.com, protos.com, coinjournal.net,
+              cryptobriefing.com, news.bitcoin.com, cryptopanic.com]
+      source_tier: 3
+
+    official_primary:
+      auth: none
+      free: true
+      status: unverified
+      source_tier: 1
+      sources:
+        - {name: binance_announcements, gives: [listings], note: "fastest scheduled catalyst"}
+        - {name: sec,     host: www.sec.gov}
+        - {name: fed,     host: www.federalreserve.gov}
+        - {name: hl_universe_changes, status: verified, store: "events.db::hl_universe_changes"}
+
+    cryptocurrency_cv:
+      base: https://cryptocurrency.cv
+      auth: none
+      free: true
+      status: planned
+      gives: [aggregated_crypto_news, historical_archive]
+
+  social:
+    store: social.db::posts
+    status: verified
+    verified_on: 2026-09-02
+    coverage: {channels_live: 19, posts: 15856, history_days: 9.9}
+    freshness_sla_s: 3600
+    known_issue: "frequent URLError timeouts on reddit/stocktwits — needs retry+backoff in collectors/"
+    channels:
+      stocktwits: {symbols: [BTC.X, ETH.X, SOL.X, XRP.X, DOGE.X], posts: 12576, status: verified}
+      reddit:     {subs: [Bitcoin, CryptoCurrency, CryptoMarkets, solana, ethereum], posts: 1308, status: verified}
+      reddit_stale: {subs: [SatoshiStreetBets], posts: 26, status: stale, stale_days: 8, failures: 156}
+      fourchan:   {boards: [biz], posts: 1328, status: verified}
+      telegram:   {channels: [whale_alert_io, wublockchainenglish, cointelegraph, WatcherGuru,
+                              binance_announcements, bwenews, unfolded], posts: 810, status: verified}
+    planned:
+      lunarcrush: {base: "https://lunarcrush.com/api4/public/topic/{topic}/v1", auth: none, free: true, priority: 5,
+                   note: "probed in scripts/probe_sentiment.py but NOT collecting"}
+      farcaster:  {base: "https://client.warpcast.com/v2/recent-casts", auth: none, free: true, priority: 5,
+                   note: "probed but NOT collecting"}
+      bitcointalk: {host: bitcointalk.org, auth: none, free: true}
+    excluded:
+      x_twitter: {reason: "no free tier since Feb 2026", see: "SOURCES.md §9"}
+      discord:   {reason: "only via own bot invited to bot-permitting servers; self-bots violate ToS", policy: gated}
+
+  macro:
+    yahoo_finance:
+      base: https://query1.finance.yahoo.com
+      auth: none
+      free: true
+      status: unverified
+      in_use: ["^VIX", "^GSPC"]
+      gap: "read live, NOT stored — §11 needs stored deep history"
+    treasury_fiscaldata:
+      base: https://api.fiscaldata.treasury.gov
+      auth: none
+      free: true
+      status: unverified
+      gives: [tga_balance]
+    bea:
+      base: https://apps.bea.gov
+      auth: none
+      free: true
+      status: unverified
+    fred:
+      base: https://fred.stlouisfed.org
+      auth: key
+      free: true
+      status: planned
+      priority: 3
+      gives: [treasury_yields, inflation_expectations_T5YIE_T10YIE, wti_oil_DCOILWTICO, dxy, real_rates]
+      why: "the backbone series for newsystem.md §11 causal chains; decades of free history"
+
+  prediction_markets:
+    kalshi:
+      base: https://api.elections.kalshi.com
+      auth: none
+      free: true
+      status: unverified
+      priority: 6
+    polymarket:
+      hosts: [gamma-api.polymarket.com, clob.polymarket.com]
+      auth: none
+      free: true
+      status: unverified
+      priority: 6
+    why: "the ONLY direct read on what the market EXPECTED — required for the priced-in/surprise agent (newsystem.md §3.3, §12 expectation_gap)"
+
+  reference:
+    coingecko:
+      base: https://api.coingecko.com
+      auth: none
+      free: true
+      status: verified
+      gives: [market_cap, fdv, supply, categories]
+    token_unlocks:
+      via: coingecko_ids
+      status: verified
+      store: unlocks.db::unlocks
+      coverage: {tokens: 142}
+    alternative_me:
+      base: https://api.alternative.me
+      auth: none
+      free: true
+      status: verified
+      gives: [fear_greed_index]
+    arxiv:
+      base: https://export.arxiv.org
+      auth: none
+      free: true
+      status: verified
+      gives: [qfin_papers]
+
+build_order:
+  1: {task: hl_whale_tracking,      category: crypto_onchain, why: "free, unique, positions not opinions"}
+  2: {task: binance_archive_backfill, category: crypto_cex,   why: "unblocks §11 causal-edge estimation"}
+  3: {task: macro_history_storage,  category: macro,          why: "deep history for causal chain"}
+  4: {task: deribit_options_chain,  category: derivatives,    why: "skew/put-call/term structure"}
+  5: {task: lunarcrush_farcaster,   category: social,         why: "endpoints already probed, ~1h"}
+  6: {task: prediction_markets,     category: prediction_markets, why: "the 'what was expected' input"}
+  7: {task: collector_reliability,  category: collectors,     why: "fix reddit/stocktwits timeouts"}
